@@ -1,0 +1,421 @@
+Creando una tabla a partir de un servidor remoto (23)
+CREATE TABLE EMPLOYEE4 AS
+(SELECT PROJNO, PROJNAME, DEPTNO
+FROM REMOTESYS.TESTSCHEMA.EMPLOYEE
+WHERE DEPTNO = ’D11’) WITH DATA
+
+DECLARE GLOBAL TEMPORARY TABLE EMPLOYEE4 (Project_number, Project_name, Department_number) AS
+(SELECT PROJNO, PROJNAME, DEPTNO
+FROM REMOTESYS.TESTSCHEMA.EMPLOYEE
+WHERE DEPTNO = ’D11’) WITH DATA INCLUDING DEFAULTS
+
+Columna fecha que se actualiza automáticamente con INSERT, UPDATE
+CREATE TABLE ORDERS
+(ORDERNO SMALLINT,
+SHIPPED_TO VARCHAR(36),
+ORDER_DATE DATE,
+STATUS CHAR(1),
+CHANGE_TS TIMESTAMP FOR EACH ROW ON UPDATE AS ROW CHANGE TIMESTAMP NOT NULL
+
+Columna autonumerico
+CREATE TABLE ORDERS
+(ORDERNO SMALLINT NOT NULL
+GENERATED ALWAYS AS IDENTITY
+(START WITH 500
+INCREMENT BY 1
+CYCLE),
+SHIPPED_TO VARCHAR (36) ,
+ORDER_DATE DATE)
+
+
+
+
+LABEL ON
+TABLE CORPDATA.DEPARTMENT IS ’Department Structure Table’
+LABEL ON
+COLUMN CORPDATA.DEPARTMENT.ADMRDEPT IS ’Reports to Dept.’
+
+COMMENT ON TABLE CORPDATA.EMPLOYEE IS
+’Employee table. Each row in this table represents
+one employee of the company.’
+SQL
+
+SELECT LONG_COMMENT
+FROM CORPDATA.SYSTABLES
+WHERE NAME = ’EMPLOYEE’
+
+Cambiando tipo de datos
+SELECT CHAR (BIRTHDATE,USA)
+FROM CORPDATA.EMPLOYEE
+You can also use the CAST specification to cast data types directly:
+SELECT CAST(BIRTHDATE AS CHAR(10))
+FROM CORPDATA.EMPLOYEE
+
+Algunas operaciones con fecha
+SELECT YEAR(CURRENT DATE - BIRTHDATE)
+FROM CORPDATA.EMPLOYEE
+
+SELECT ORDERNO, ROW CHANGE TIMESTAMP FOR ORDERS
+FROM ORDERS
+WHERE ORDER_DATE < CURRENT DATE - 4 WEEKS
+
+Usos de BETWEEN, IN, EXISTS, IS NULL, and LIKE.
+... WHERE HIREDATE BETWEEN ’1987-01-01’ AND ’1987-12-31’
+
+... WHERE HIREDATE >= ’1987-01-01’ AND HIREDATE <= ’1987-12-31’  Identico resultado que la precedente
+
+... WHERE WORKDEPT IN (’A00’, ’C01’, ’E21’)
+
+... WHERE EMPLOYEE.PHONE IS NULL
+
+Sub consultas
+SELECT EMPNO, LASTNAME, JOB
+FROM CORPDATA.EMPLOYEE
+WHERE EMPNO IN
+(SELECT EMPNO
+FROM CORPDATA.EMPPROJACT
+WHERE PROJNO = ’MA2100’)
+
+SELECT EMPNO, LASTNAME, SALARY
+FROM CORPDATA.EMPLOYEE
+WHERE EDLEVEL >
+(SELECT AVG(EDLEVEL)
+FROM CORPDATA.EMPLOYEE)
+
+Sub consultas con ALL, ANY, or SOME
+... WHERE expression > ALL (subquery) la expresion debe ser mayor que TODAS las filas de la sub consultas
+... WHERE expression > ANY (subquery) al menos una fila es mayor que expresion
+... WHERE WORKDEPT NOT IN (SELECT ...) usar IN es equivalente a usar ANY o SOME
+
+SELECT EMPNO,LASTNAME
+FROM CORPDATA.EMPLOYEE
+WHERE EXISTS
+(SELECT *
+FROM CORPDATA.PROJECT
+WHERE PRSTDATE > ’1982-01-01’);  Verifica si retorna al menos una fila de la consulta interna 
+
+... WHERE NOT EXISTS (SELECT ...) verifica que no retorne ninguna fila de la consulta interna
+
+SELECT EMPNO, LASTNAME, WORKDEPT, EDLEVEL
+FROM CORPDATA.EMPLOYEE X
+WHERE EDLEVEL >
+(SELECT AVG(EDLEVEL)
+FROM CORPDATA.EMPLOYEE
+WHERE WORKDEPT = X.WORKDEPT)
+
+Uso del GROUP BY y HAVING
+SELECT WORKDEPT, DECIMAL(AVG(SALARY),8,2)
+FROM CORPDATA.EMPLOYEE X
+GROUP BY WORKDEPT
+HAVING AVG(SALARY) >
+(SELECT AVG(SALARY)
+FROM CORPDATA.EMPLOYEE
+WHERE SUBSTR(X.WORKDEPT,1,1) = SUBSTR(WORKDEPT,1,1))
+
+UPDATE CORPDATA.PROJECT X
+SET PRIORITY = 1
+WHERE ’1983-09-01’ >
+(SELECT MAX(EMENDATE)
+FROM CORPDATA.EMPPROJACT
+WHERE PROJNO = X.PROJNO)
+
+DELETE FROM CORPDATA.EMPPROJACT X
+WHERE NOT EXISTS
+(SELECT *
+FROM CORPDATA.PROJECT
+WHERE PROJNO = X.PROJNO)
+
+SELECT EMPNO, SALARY,
+RANK() OVER(ORDER BY SALARY DESC),
+DENSE_RANK() OVER(ORDER BY SALARY DESC),
+ROW_NUMBER() OVER(ORDER BY SALARY DESC)
+FROM EMPLOYEE
+FETCH FIRST 10 ROWS ONLY      Lee las primeras 10 filas, 
+
+Las funciones RANK, DENSE_RANK y ROW_NUMBER se utilizan para obtener el valor entero creciente,
+basado en el orden de las filas mediante la imposición de la cláusula ORDER BY en la
+instrucción SELECT.
+Cuando utilizamos las funciones RANK, DENSE_RANK o ROW_NUMBER, se requiere la cláusula ORDER BY 
+la cláusula PARTITION BY es opcional.
+Cuando utilizamos la cláusula PARTITION BY, los datos seleccionados se dividirán y el valor entero
+se restablecerá a 1 cuando la partición cambie.
+
+Por investigar RANK() y/o DENSE_RANK permiten conocer la "primera de grupo"
+
+JOIN
+SELECT EMPNO, LASTNAME, PROJNO
+FROM CORPDATA.EMPLOYEE INNER JOIN CORPDATA.PROJECT
+ON EMPNO = RESPEMP
+WHERE LASTNAME > ’S’
+
+Join con 3 tablas
+select nombre,titulo,fechaprestamo
+  from prestamos as p
+  left join socios as s
+  on p.documento=s.documento
+  left join libros as l
+  on l.codigo=p.codigolibro;
+
+  For example, look at the USING clause in this statement:
+SELECT EMPNO, ACSTDATE
+FROM CORPDATA.PROJACT INNER JOIN CORPDATA.EMPPROJACT
+USING (PROJNO, ACTNO)
+WHERE ACSDATE > ’1982-12-31’;
+
+The syntax in this statement is valid and equivalent to the join condition in the following statement:
+SELECT EMPNO, ACSTDATE
+FROM CORPDATA.PROJACT INNER JOIN CORPDATA.EMPPROJACT
+ON CORPDATA.PROJACT.PROJNO = CORPDATA.EMPPROJACT.PROJNO AND
+CORPDATA.PROJACT.ACTNO = CORPDATA.EMPPROJACT.ACTNO
+WHERE ACSTDATE > ’1982-12-31’;
+
+Ejemplo sencillo sobre LEFT OUTER JOIN
+SELECT EMPNO, LASTNAME, PROJNO
+FROM CORPDATA.EMPLOYEE LEFT OUTER JOIN CORPDATA.PROJECT
+ON EMPNO = RESPEMP
+WHERE LASTNAME > ’S’
+
+Esta consulta genera el mismo resultado que la anterior
+SELECT EMPNO, LASTNAME, PROJNO
+FROM CORPDATA.PROJECT RIGHT OUTER JOIN CORPDATA.EMPLOYEE
+ON EMPNO = RESPEMP
+WHERE LASTNAME > ’S’
+
+RRN scalar function to return the relative record number for a column in the table
+
+EXCEPTION JOIN Una combinación de excepción a la izquierda devuelve solo las filas de la primera 
+tabla que no tienen una coincidencia en el segunda Tabla
+
+SELECT EMPNO, LASTNAME, PROJNO
+FROM CORPDATA.EMPLOYEE EXCEPTION JOIN CORPDATA.PROJECT
+ON EMPNO = RESPEMP
+WHERE LASTNAME > ’S’
+
+Esta consulta genera el mismo resultado que la anterior
+SELECT EMPNO, LASTNAME
+FROM CORPDATA.EMPLOYEE
+WHERE LASTNAME > ’S’
+AND NOT EXISTS
+(SELECT * FROM CORPDATA.PROJECT
+WHERE EMPNO = RESPEMP)
+
+Al igual que las combinaciones externas izquierda y derecha, una combinación externa completa devuelve filas 
+coincidentes de ambas tablas. Sin embargo, un la combinación externa completa también devuelve filas no coincidentes 
+de ambas tablas.
+SELECT EMPNO, LASTNAME, PROJNO
+FROM CORPDATA.EMPLOYEE FULL OUTER JOIN CORPDATA.PROJECT
+ON EMPNO = RESPEMP
+WHERE LASTNAME > ’S’
+
+Join con mas de dos tablas
+SELECT EMPNO, LASTNAME, DEPTNAME, PROJNO
+FROM CORPDATA.EMPLOYEE INNER JOIN CORPDATA.DEPARTMENT
+ON WORKDEPT = DEPTNO
+LEFT OUTER JOIN CORPDATA.PROJECT
+ON EMPNO = RESPEMP
+WHERE LASTNAME > ’S’
+
+SELECT
+a.pcid,
+b.mem_tipo,
+b.mem_capacidad AS mem_MB,
+c.cpu_fabricante AS cpu_fab,
+c.cpu_tipo,
+d.disco_fabricante AS disco_fab,
+d.disco_capacidad AS disco_GB,
+e.tgraf_fabricante AS tgraf_fab,
+a.precio
+FROM pc AS a
+INNER JOIN memoria AS b ON (a.memoria = b.mem_id)
+INNER JOIN cpu AS c ON (a.cpu = c.cpu_id)
+INNER JOIN disco AS d ON (a.disco = d.disco_id)
+INNER JOIN tgrafica AS e ON (a.tgrafica = e.tgraf_id)
+ORDER BY precio DESC;
+
+
+-----------------------------------------------------------------------------------------------------------
+Uso de EXCEPT
+Obtener una relación de solo los modelos de 'PC NO completos' a la venta. Queremos toda la información disponible sobre los componentes que lo forman
+
+Si os fijais esta consulta la podriamos obtener si al resultado que muestra todos los PCs, le 'restamos' el resultado con solo los PCs completos.
+Esto lo podriamos realizar combinando la consulta 1 con la consulta 2 mediante el operador EXCEPT (consulta 2 EXCEPT consulta 1):
+
+(
+SELECT
+a.pcid,
+b.mem_tipo,
+b.mem_capacidad AS mem_MB,
+c.cpu_fabricante AS cpu_fab,
+c.cpu_tipo,
+d.disco_fabricante AS disco_fab,
+d.disco_capacidad AS disco_GB,
+e.tgraf_fabricante AS tgraf_fab,
+a.precio
+FROM pc AS a
+LEFT OUTER JOIN memoria AS b ON (a.memoria = b.mem_id)
+LEFT OUTER JOIN cpu AS c ON (a.cpu = c.cpu_id)
+LEFT OUTER JOIN disco AS d ON (a.disco = d.disco_id)
+LEFT OUTER JOIN tgrafica AS e ON (a.tgrafica = e.tgraf_id)
+)
+
+EXCEPT
+
+(
+SELECT
+a.pcid,
+b.mem_tipo,
+b.mem_capacidad AS mem_MB,
+c.cpu_fabricante AS cpu_fab,
+c.cpu_tipo,
+d.disco_fabricante AS disco_fab,
+d.disco_capacidad AS disco_GB,
+e.tgraf_fabricante AS tgraf_fab,
+a.precio
+FROM pc AS a
+INNER JOIN memoria AS b ON (a.memoria = b.mem_id)
+INNER JOIN cpu AS c ON (a.cpu = c.cpu_id)
+INNER JOIN disco AS d ON (a.disco = d.disco_id)
+INNER JOIN tgrafica AS e ON (a.tgrafica = e.tgraf_id)
+)
+ORDER BY precio DESC;
+
+La primera consulta trae todos los PC en existencia, estén o no completo.
+La segunda consulta trae solo los PC en existencia que están completos.
+El EXCEPT resta o excluye los PC de la segunda consulta de la primera consulta, el resultado es todos los PC que les falta al menos un componente. 
+--------------------------------------------------------------------------
+
+
+
+
+
+La tercera columna del SELECT principal es el resultado de una sub consulta 81
+SELECT MGRNO, T1.DEPTNO, MAXSAL
+FROM CORPDATA.DEPARTMENT T1,
+(SELECT MAX(SALARY) AS MAXSAL, WORKDEPT
+FROM CORPDATA.EMPLOYEE E1
+GROUP BY WORKDEPT) T2
+WHERE T1.DEPTNO = T2.WORKDEPT
+ORDER BY DEPTNO
+
+Uso de WITH y UNION
+WITH DT AS (SELECT E.WORKDEPT AS DEPTNO, AVG(SALARY) AS AVGSAL
+FROM CORPDATA.DEPARTMENT D , CORPDATA.EMPLOYEE E
+WHERE D.DEPTNO = E.WORKDEPT
+GROUP BY E.WORKDEPT)
+SELECT ’E’, MAX(AVGSAL), MIN(AVGSAL) FROM DT
+WHERE DEPTNO LIKE ’E%’
+UNION
+SELECT ’D’, MAX(AVGSAL), MIN(AVGSAL) FROM DT
+WHERE DEPTNO LIKE ’D%’
+
+Consultas anidadas
+SELECT MGRNO, T1.DEPTNO, MAXSAL
+FROM CORPDATA.DEPARTMENT T1,
+(SELECT MAX(SALARY) AS MAXSAL, WORKDEPT
+FROM CORPDATA.EMPLOYEE E1
+GROUP BY WORKDEPT) T2
+WHERE T1.DEPTNO = T2.WORKDEPT
+ORDER BY DEPTNO 
+
+Uso del With y Union 
+WITH DT AS (SELECT E.WORKDEPT AS DEPTNO, AVG(SALARY) AS AVGSAL
+FROM CORPDATA.DEPARTMENT D , CORPDATA.EMPLOYEE E
+WHERE D.DEPTNO = E.WORKDEPT
+GROUP BY E.WORKDEPT)
+SELECT ’E’, MAX(AVGSAL), MIN(AVGSAL) FROM DT
+WHERE DEPTNO LIKE ’E%’
+UNION
+SELECT ’D’, MAX(AVGSAL), MIN(AVGSAL) FROM DT
+WHERE DEPTNO LIKE ’D%’
+
+With (caso de estudio, dos consultas con With)
+WITH X AS (SELECT ORDER_ID, CUST_ID
+FROM ORDERS
+ORDER BY ORD_DATE DESC
+FETCH FIRST 1000 ROWS ONLY),
+Y AS (SELECT CUST_ID, LINE_ID, ORDER_QTY
+FROM X, ORDERLINE
+WHERE X.ORDER_ID = ORDERLINE.ORDER_ID)
+SELECT LINE_ID
+FROM (SELECT LINE_ID
+FROM Y
+WHERE Y.CUST_ID IN (SELECT DISTINCT CUST_ID
+FROM Y
+WHERE LINE.ID = ’XXX’ )
+GROUP BY LINE_ID
+ORDER BY SUM(ORDER_QTY) DESC)
+FETCH FIRST 5 ROWS ON
+
+---------------------------------------------------------------------------------------
+
+Consultas con jerarquia y recursividad 
+
+SELECT CONNECT_BY_ROOT departure AS origin, departure, arrival, LEVEL AS flight_count
+FROM flights
+START WITH departure = ’Chicago’
+CONNECT BY PRIOR arrival = departure
+
+SELECT CONNECT_BY_ROOT departure AS departure, arrival, LEVEL - 1 connections
+FROM
+( SELECT departure, arrival FROM flights
+UNION
+SELECT departure, arrival FROM trains) t
+START WITH departure = ’Chicago’
+CONNECT BY PRIOR arrival = departure;
+
+SELECT CONNECT_BY_ROOT departure AS origin, departure, arrival,
+LEVEL level, price ticket_price
+FROM flights
+START WITH departure = ’New York’
+CONNECT BY PRIOR arrival = departure
+ORDER SIBLINGS BY price ASC
+
+SELECT CONNECT_BY_ROOT departure AS origin, arrival,
+SYS_CONNECT_BY_PATH(TRIM(arrival), ’ : ’) itinerary, CONNECT_BY_ISCYCLE cyclic
+FROM flights
+START WITH departure = ’New York’
+CONNECT BY NOCYCLE PRIOR arrival = departure;
+
+SELECT CONNECT_BY_ROOT departure AS origin, arrival,
+SYS_CONNECT_BY_PATH(TRIM(arrival), ’ : ’) itinerary, CONNECT_BY_ISLEAF leaf
+FROM flights
+START WITH departure = ’New York’
+CONNECT BY PRIOR arrival = departure;
+
+SELECT CONNECT_BY_ROOT departure AS origin, departure, arrival,
+flight_number, on_time_Percent AS onTime
+FROM flights INNER JOIN flightstats ON flight_number = flight#
+WHERE on_time_percent > 90
+START WITH departure = ’New York’
+CONNECT BY PRIOR arrival = departure;
+
+
+WITH destinations (departure, arrival, connections, flights, trains, cost) AS
+(SELECT f.departure, f.arrival, 0, 1, 0, price
+FROM flights f
+WHERE f.departure = ’Chicago’
+UNION ALL
+SELECT t.departure, t.arrival, 0, 0, 1, price
+FROM trains t
+WHERE t.departure = ’Chicago’
+UNION ALL
+SELECT r.departure, b.arrival, r.connections + 1 , r.flights + 1, r.trains,
+r.cost + b.price
+FROM destinations r, flights b
+WHERE r.arrival = b.departure
+UNION ALL
+SELECT r.departure, c.arrival, r.connections + 1 ,
+r.flights, r.trains + 1, r.cost + c.price
+FROM destinations r, trains c
+WHERE r.arrival = c.departure)
+SELECT departure, arrival, connections, flights, trains, cost
+FROM destinations
+
+
+
+
+--------------------------------------------------------------------------------------
+
+
+
+
